@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -56,13 +57,16 @@ func main() {
 	defer buff.Flush()
 
 	for n, maxline := 0, int(kline)*1000; n < maxline; n++ {
+		var line []float32
+
 		for d := 0; d < int(dimension); d++ {
-			if d != 0 {
-				fmt.Fprint(buff, ",")
-			}
-			fmt.Fprintf(buff, "%.10f", genFloat32(r, min, max))
+			line = append(line, genFloat32(r, min, max))
 		}
-		fmt.Fprint(buff, "\n")
+
+		if err := json.NewEncoder(buff).Encode(line); err != nil {
+			fmt.Println("write error:", err)
+			os.Exit(-1)
+		}
 
 		if n%100 == 0 {
 			fmt.Printf("generated %d lines...\n", n)

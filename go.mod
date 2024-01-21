@@ -3,6 +3,11 @@ module vdbbench
 go 1.21.5
 
 require (
+	github.com/weaviate/weaviate v1.23.1
+	github.com/weaviate/weaviate-go-client/v4 v4.12.1
+)
+
+require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
@@ -20,8 +25,6 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/weaviate/weaviate v1.23.1 // indirect
-	github.com/weaviate/weaviate-go-client/v4 v4.12.1 // indirect
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect

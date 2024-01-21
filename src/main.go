@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
-	"vdbbench/client"
+	"os"
 
-	"github.com/weaviate/weaviate-go-client/v4/weaviate/graphql"
+	"vdbbench/src/client"
+
 	"github.com/weaviate/weaviate/entities/models"
 )
 
@@ -20,74 +24,55 @@ func main() {
 		Class: "Question",
 	}
 
-	// add the schema
-	err = client.Schema().ClassCreator().WithClass(classObj).Do(context.Background())
+	ctx := context.Background()
+
+	exists, err := client.Schema().ClassExistenceChecker().WithClassName("Question").Do(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
+	if !exists {
+		// add the schema
+		if err = client.Schema().ClassCreator().WithClass(classObj).Do(ctx); err != nil {
+			log.Fatal(err)
+		}
+	}
 
-	defer func() {
-		err = client.Schema().ClassDeleter().
-			WithClassName("Question").
-			Do(context.Background())
+	f, err := os.Open("./data/sources.json")
+	if err != nil {
+		log.Fatalf("open error: %v", err)
+	}
+	defer f.Close()
 
+	buff := bufio.NewReader(f)
+
+	decoder := json.NewDecoder(buff)
+	for i := 0; ; i++ {
+		var line []float32
+		if err := decoder.Decode(&line); err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			log.Fatalf("read error: %v", err)
+		}
+
+		object := models.Object{
+			Class: "Question",
+			Properties: map[string]any{
+				"line": fmt.Sprintf("line %d", i),
+			},
+			Vector: line,
+		}
+
+		batchRes, err := client.Batch().ObjectsBatcher().WithObjects(&object).Do(ctx)
 		if err != nil {
 			log.Fatal(err)
 		}
-	}()
-
-	items := []struct {
-		Category string
-		Question string
-		Answer   string
-	}{
-		{"SCIENCE", "This organ removes excess glucose from the blood & stores it as glycogen", "Liver"},
-		{"ANIMALS", "It's the only living mammal in the order Proboseidea", "Elephant"},
-		{"SCIENCE", "In 70-degree air, a plane traveling at about 1,130 feet per second breaks it", "Sound barrier"},
-	}
-	objects := make([]*models.Object, len(items))
-	for i := range items {
-		objects[i] = &models.Object{
-			Class: "Question",
-			Properties: map[string]any{
-				"category": items[i].Category,
-				"question": items[i].Question,
-				"answer":   items[i].Answer,
-			},
-			Vector: []float32{0.1, 0.4, 0.2},
+		for _, res := range batchRes {
+			if res.Result.Errors != nil {
+				panic(res.Result.Errors.Error)
+			}
 		}
 	}
 
-	batchRes, err := client.Batch().ObjectsBatcher().WithObjects(objects...).Do(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, res := range batchRes {
-		if res.Result.Errors != nil {
-			panic(res.Result.Errors.Error)
-		}
-	}
-
-	fields := []graphql.Field{
-		{Name: "question"},
-		{Name: "answer"},
-		{Name: "category"},
-	}
-
-	near := client.GraphQL().
-		NearVectorArgBuilder().
-		WithDistance(0.2).
-		WithVector([]float32{0.1, 0.3, 0.2})
-
-	result, err := client.GraphQL().Get().
-		WithClassName("Question").
-		WithFields(fields...).
-		WithNearVector(near).
-		WithLimit(2).
-		Do(context.Background())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("%+v\n", result)
 }
