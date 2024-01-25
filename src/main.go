@@ -5,74 +5,68 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
+	"time"
 
-	"vdbbench/src/client"
-
-	"github.com/weaviate/weaviate/entities/models"
+	"vdbbench/src/weaviate"
 )
 
-func main() {
-	client, err := client.NewWeaviateClient("localhost:8080")
-	if err != nil {
-		panic(err)
-	}
+type VDB interface {
+	Prepare(ctx context.Context) error
+	Import(ctx context.Context, input *json.Decoder) error
+}
 
-	classObj := &models.Class{
-		Class: "Question",
+func main() {
+	vdb, err := weaviate.New("localhost:8080")
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	ctx := context.Background()
 
-	exists, err := client.Schema().ClassExistenceChecker().WithClassName("Question").Do(ctx)
-	if err != nil {
+	if err := vdb.Prepare(ctx); err != nil {
 		log.Fatal(err)
 	}
-	if !exists {
-		// add the schema
-		if err = client.Schema().ClassCreator().WithClass(classObj).Do(ctx); err != nil {
-			log.Fatal(err)
-		}
-	}
 
-	f, err := os.Open("./data/sources.json")
-	if err != nil {
-		log.Fatalf("open error: %v", err)
-	}
-	defer f.Close()
+	// Time(ctx, "import:", func() {
+	// f, err := os.Open("./data/sources.json")
+	// if err != nil {
+	// log.Fatalf("open error: %v", err)
+	// }
+	// defer f.Close()
 
-	buff := bufio.NewReader(f)
+	// buff := bufio.NewReader(f)
+	// decoder := json.NewDecoder(buff)
 
-	decoder := json.NewDecoder(buff)
-	for i := 0; ; i++ {
-		var line []float32
-		if err := decoder.Decode(&line); err != nil {
-			if err == io.EOF {
-				break
-			}
+	// if err := vdb.Import(ctx, decoder); err != nil {
+	// log.Fatal(err)
+	// }
+	// })
 
-			log.Fatalf("read error: %v", err)
-		}
-
-		object := models.Object{
-			Class: "Question",
-			Properties: map[string]any{
-				"line": fmt.Sprintf("line %d", i),
-			},
-			Vector: line,
-		}
-
-		batchRes, err := client.Batch().ObjectsBatcher().WithObjects(&object).Do(ctx)
+	Time(ctx, "query:", func() {
+		f, err := os.Open("./data/queries.json")
 		if err != nil {
+			log.Fatalf("open error: %v", err)
+		}
+		defer f.Close()
+
+		buff := bufio.NewReader(f)
+		decoder := json.NewDecoder(buff)
+
+		if err := vdb.Query(ctx, decoder); err != nil {
 			log.Fatal(err)
 		}
-		for _, res := range batchRes {
-			if res.Result.Errors != nil {
-				panic(res.Result.Errors.Error)
-			}
-		}
-	}
+	})
+}
 
+func Time(ctx context.Context, info string, fn func()) {
+	start := time.Now()
+	defer func() {
+		end := time.Now()
+		dur := end.Sub(start)
+		fmt.Println(info, "duration:", dur)
+	}()
+
+	fn()
 }
