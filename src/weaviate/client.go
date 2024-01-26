@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/weaviate/weaviate-go-client/v4/weaviate/graphql"
 	"github.com/weaviate/weaviate-go-client/v4/weaviate"
 	"github.com/weaviate/weaviate/entities/models"
 )
@@ -100,7 +101,16 @@ func (c *Client) Query(ctx context.Context, input *json.Decoder) error {
 		}
 
 		nearVector := c.client.GraphQL().NearVectorArgBuilder().WithVector(line)
-		resp, err := c.client.GraphQL().Get().WithClassName(className).WithNearVector(nearVector).Do(ctx)
+		field := graphql.Field{Name: "line"}
+		_additional := graphql.Field{
+			Name: "_additional", Fields: []graphql.Field{
+				{Name: "certainty"}, // only supported if distance==cosine
+				{Name: "distance"},  // always supported
+				//{Name: "vector"},
+				{Name: "id"},
+			},
+		}
+		resp, err := c.client.GraphQL().Get().WithClassName(className).WithFields(field, _additional).WithNearVector(nearVector).WithLimit(5).Do(ctx)
 		if err != nil {
 			return fmt.Errorf("weaviate: query data error: %w", err)
 		}
