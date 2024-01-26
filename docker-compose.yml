@@ -1,10 +1,8 @@
 version: '3'
 
 services:
-
   weaviate:
     image: docker.io/semitechnologies/weaviate:1.23.1
-    restart: on-failure:0
     command:
       - --host
       - 0.0.0.0
@@ -25,3 +23,10 @@ services:
       DEFAULT_VECTORIZER_MODULE: 'none'
       ENABLE_MODULES: ''
       CLUSTER_HOSTNAME: 'weaviate'
+
+  qdrant:
+    image: qdrant/qdrant:v1.7.3
+    ports:
+      - 6333:6333
+    volumes:
+      - ./data/qdrant:/qdrant/storage
